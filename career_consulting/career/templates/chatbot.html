@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>CareerGuide - Your AI Career Co-Pilot</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .chat-container {
+            height: 65vh;
+            overflow-y: auto;
+            padding: 1rem;
+            background-color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            /* Space between bubbles */
+        }
+        
+        .chat-bubble {
+            max-width: 85%;
+            padding: 12px 18px;
+            border-radius: 20px;
+            position: relative;
+            word-wrap: break-word;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(15px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .chat-bubble.user {
+            background-color: #0d6efd;
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+        }
+        
+        .chat-bubble.bot {
+            background-color: #e9ecef;
+            color: #212529;
+            margin-right: auto;
+            border-bottom-left-radius: 5px;
+        }
+        
+        .chat-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .chat-container::-webkit-scrollbar-thumb {
+            background-color: #adb5bd;
+            border-radius: 3px;
+        }
+        
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 5px;
+            /* Spacing from the message above */
+            margin-right: auto;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+        <div class="container">
+            <a class="navbar-brand text-primary fw-bold" href="{% url 'career:home' %}">Pathwise</a>
+        </div>
+    </nav>
+
+    <header class="position-relative text-center py-5 overflow-hidden">
+        <div class="position-absolute top-0 start-0 w-100 h-100" style="background-image: url('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQT0fB442GWf875uEDb-hSwbkvCuRCUjEDkSg&s'); background-size: cover; background-position: center; filter: blur(4px); opacity: 0.9;">
+        </div>
+        <div class="position-relative z-1">
+            <div class="container bg-white bg-opacity-75 p-4 rounded-3" style="max-width: 700px;">
+                <h1 class="display-4 text-primary">CareerGuide</h1>
+                <p class="lead text-secondary">Guidance. Insight. Clarity. One chat away.</p>
+                <a href="{% url 'career:skill_analysis' %}" class="btn btn-outline-primary btn-lg mx-2">Analyze your skills</a>
+                <a href="{% url 'career:resume_upload' %}" class="btn btn-outline-primary btn-lg mx-2">Resume Parsing</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container my-4">
+        <div class="card shadow-sm">
+            <div class="card-header text-center bg-primary text-white">
+                <h4 class="mb-0">CareerBot</h4>
+                <p class="mb-0 small">Ask me about jobs, skills, or resume tips.</p>
+            </div>
+            <div class="card-body chat-container" id="chatBox">
+            </div>
+            <div class="card-footer bg-white">
+                <form id="chatForm" class="d-flex align-items-center">
+                    <input type="text" class="form-control border-0 shadow-none me-2" id="userInput" placeholder="Describe your skills or dream job..." required autocomplete="off">
+                    <button type="submit" class="btn btn-primary rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                        <i class="bi bi-send-fill"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </main>
+    <footer class="text-center py-4 bg-white border-top">
+        <div class="container">
+            <small class="text-muted">© 2025 Career Consulting AI | Built for Learners & Job Seekers</small><br>
+            <a href="#" class="text-decoration-none text-muted mx-2">Privacy</a> |
+            <a href="#" class="text-decoration-none text-muted mx-2">Terms</a> |
+            <a href="#" class="text-decoration-none text-muted mx-2">Contact</a>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // DOM element references
+            const chatBox = document.getElementById('chatBox');
+            const chatForm = document.getElementById('chatForm');
+            const userInput = document.getElementById('userInput');
+            const submitBtn = chatForm.querySelector('button');
+
+            // Function to get Django's CSRF token from cookies
+            function getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+
+            // Function to add a new message bubble to the chat window
+            function addMessage(htmlContent, type) {
+                const bubble = document.createElement('div');
+                // THE FIX: Split the 'type' string by spaces and add each part as a separate class.
+                const classes = type.split(' ');
+                bubble.classList.add('chat-bubble', ...classes);
+
+                bubble.innerHTML = htmlContent;
+                chatBox.appendChild(bubble);
+                // Auto-scroll to the latest message
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+
+            // Main function to send a message to the backend and handle the response
+            async function sendMessage(messageText) {
+                // Display the user's message immediately
+                addMessage(messageText, 'user');
+
+                // Disable the form to prevent multiple submissions
+                userInput.value = '';
+                userInput.disabled = true;
+                submitBtn.disabled = true;
+
+                // Show a loading spinner
+                addMessage('<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div>', 'bot');
+
+                // Get the user's selected AI model
+                const selectedModel = document.querySelector('input[name="modelChoice"]:checked').value;
+
+                try {
+                    const response = await fetch('/chatbot/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCookie('csrftoken')
+                        },
+                        body: JSON.stringify({
+                            message: messageText,
+                            model_choice: selectedModel // Send the model choice to the backend
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Server responded with status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+
+                    // Remove the loading spinner
+                    chatBox.removeChild(chatBox.lastChild);
+
+                    // Display the bot's main text response
+                    if (data.response) {
+                        addMessage(data.response, 'bot');
+                    }
+
+                    // If the backend sent a structured recommendation, display it in a special bubble
+                    if (data.recommendation) {
+                        // This now correctly calls addMessage with 'bot recommendation'
+                        addMessage(data.recommendation, 'bot recommendation');
+                    }
+
+                } catch (error) {
+                    console.error('Chatbot Error:', error);
+                    // Remove loading spinner and show an error message
+                    if (chatBox.lastChild) {
+                        chatBox.removeChild(chatBox.lastChild);
+                    }
+                    addMessage('Sorry, something went wrong. Please check the server connection and try again.', 'bot');
+                } finally {
+                    // Re-enable the form for the next message
+                    userInput.disabled = false;
+                    submitBtn.disabled = false;
+                    userInput.focus();
+                }
+            }
+
+            // Event listener for the form submission
+            chatForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const message = userInput.value.trim();
+                if (message) {
+                    sendMessage(message);
+                }
+            });
+
+            // Automatically start the conversation when the page loads
+            sendMessage('hello');
+        });
+    </script>
+</body>
+
+</html>
